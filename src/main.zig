@@ -1,6 +1,7 @@
 //! This module is the entry point for the tarka vm's core engine
 
 const std = @import("std");
+const VM = @import("tvm.zig").VM;
 
 /// This function is the entry point of the tarka vm's core engine
 pub fn main(init: std.process.Init) !void {
@@ -21,4 +22,11 @@ pub fn main(init: std.process.Init) !void {
         return err;
     };
     defer init.gpa.free(source);
+
+    var vm = VM.init(source, init.gpa);
+    defer vm.deinit();
+    vm.execute() catch |err| {
+        std.log.err("runtime error while executing", .{});
+        return err;
+    };
 }
