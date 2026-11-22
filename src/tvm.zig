@@ -37,6 +37,8 @@ pub const VM = struct {
             switch (self.cur) {
                 0x00 => self.execute_halt(),
                 0x01 => try self.execute_push(),
+                0x02 => try self.execute_pop(),
+                0x03 => try self.execute_dup(),
                 else => {
                     return error.InstParseError;
                 },
@@ -55,10 +57,20 @@ pub const VM = struct {
             return error.PushInstParseError;
         }
         const value = std.mem.readInt(u64, self.source[self.ip + 1 ..][0..8], .little);
-        self.stack.append(self.allocator, value) catch |err| {
-            return err;
-        };
+        try self.stack.append(self.allocator, value);
         self.ip += 9;
+    }
+
+    /// executes pop instruction
+    fn execute_pop(self: *VM) !void {
+        _ = self.stack.pop() orelse return error.StackUnderflow;
+        self.ip += 1;
+    }
+
+    /// executes dup instruction
+    fn execute_dup(self: *VM) !void {
+        try self.stack.append(self.allocator, self.stack.last() orelse return error.StackUnderflow);
+        self.ip += 1;
     }
 };
 
@@ -77,4 +89,39 @@ test "push is successful" {
     try testing.expectEqual(vm.stack.items.len, 1);
     try testing.expectEqual(vm.stack.getLast(), @as(u64, 10));
     try testing.expectEqual(vm.ip, 9);
+}
+
+test "pop fails in case of underflow" {
+    var vm = VM.init(&[_]u8{}, testing.allocator);
+    defer vm.deinit();
+
+    try testing.expectError(error.StackUnderflow, vm.execute_pop());
+}
+
+test "pop is successful" {
+    var vm = VM.init(&[_]u8{0x02}, testing.allocator);
+    defer vm.deinit();
+    try vm.stack.append(testing.allocator, @as(u64, 20));
+
+    try vm.execute_pop();
+    try testing.expectEqual(vm.stack.items.len, 0);
+    try testing.expectEqual(vm.ip, 1);
+}
+
+test "dup fails in case of underflow" {
+    var vm = VM.init(&[_]u8{}, testing.allocator);
+    defer vm.deinit();
+
+    try testing.expectError(error.StackUnderflow, vm.execute_dup());
+}
+
+test "dup is successful" {
+    var vm = VM.init(&[_]u8{0x03}, testing.allocator);
+    defer vm.deinit();
+    try vm.stack.append(testing.allocator, @as(u64, 10));
+
+    try vm.execute_dup();
+    try testing.expectEqual(vm.stack.items.len, 2);
+    try testing.expectEqualSlices(u64, vm.stack.items, &[2]u64{ 10, 10 });
+    try testing.expectEqual(vm.ip, 1);
 }
