@@ -41,6 +41,9 @@ pub const VM = struct {
                 0x03 => try self.execute_dup(),
                 0x04 => try self.execute_swap(),
                 0x10 => try self.execute_print_i64(),
+                0x20 => try self.execute_add(),
+                0x21 => try self.execute_sub(),
+                0x22 => try self.execute_mul(),
                 else => {
                     return error.InstParseError;
                 },
@@ -87,6 +90,36 @@ pub const VM = struct {
     /// executes print.i64 instruction
     fn execute_print_i64(self: *VM) !void {
         std.debug.print("{d}\n", .{@as(i64, @intCast(self.stack.last() orelse return error.StackUnderflow))});
+        self.ip += 1;
+    }
+
+    /// executes add instruction
+    fn execute_add(self: *VM) !void {
+        const val1 = self.stack.pop() orelse return error.StackUnderflow;
+        const val2 = self.stack.pop() orelse return error.StackUnderflow;
+        const result = val1 + val2;
+        if (result <= std.math.minInt(i64) or result >= std.math.maxInt(i64)) return error.IntegerOverflow;
+        try self.stack.append(self.allocator, result);
+        self.ip += 1;
+    }
+
+    /// executes sub instruction
+    fn execute_sub(self: *VM) !void {
+        const val1 = self.stack.pop() orelse return error.StackUnderflow;
+        const val2 = self.stack.pop() orelse return error.StackUnderflow;
+        const result = val2 - val1;
+        if (result <= std.math.minInt(i64) or result >= std.math.maxInt(i64)) return error.IntegerOverflow;
+        try self.stack.append(self.allocator, result);
+        self.ip += 1;
+    }
+
+    /// executes mul instruction
+    fn execute_mul(self: *VM) !void {
+        const val1 = self.stack.pop() orelse return error.StackUnderflow;
+        const val2 = self.stack.pop() orelse return error.StackUnderflow;
+        const result = val2 * val1;
+        if (result <= std.math.minInt(i64) or result >= std.math.maxInt(i64)) return error.IntegerOverflow;
+        try self.stack.append(self.allocator, result);
         self.ip += 1;
     }
 };
