@@ -39,6 +39,8 @@ pub const VM = struct {
                 0x01 => try self.execute_push(),
                 0x02 => try self.execute_pop(),
                 0x03 => try self.execute_dup(),
+                0x04 => try self.execute_swap(),
+                0x10 => try self.execute_print_i64(),
                 else => {
                     return error.InstParseError;
                 },
@@ -70,6 +72,21 @@ pub const VM = struct {
     /// executes dup instruction
     fn execute_dup(self: *VM) !void {
         try self.stack.append(self.allocator, self.stack.last() orelse return error.StackUnderflow);
+        self.ip += 1;
+    }
+
+    /// executes swap instruction
+    fn execute_swap(self: *VM) !void {
+        if (self.stack.items.len < 2) return error.StackUnderflow;
+        const tmp = self.stack.items[self.stack.items.len - 1];
+        self.stack.items[self.stack.items.len - 1] = self.stack.items[self.stack.items.len - 2];
+        self.stack.items[self.stack.items.len - 2] = tmp;
+        self.ip += 1;
+    }
+
+    /// executes print.i64 instruction
+    fn execute_print_i64(self: *VM) !void {
+        std.debug.print("{d}\n", .{@as(i64, @intCast(self.stack.last() orelse return error.StackUnderflow))});
         self.ip += 1;
     }
 };
@@ -123,5 +140,25 @@ test "dup is successful" {
     try vm.execute_dup();
     try testing.expectEqual(vm.stack.items.len, 2);
     try testing.expectEqualSlices(u64, vm.stack.items, &[2]u64{ 10, 10 });
+    try testing.expectEqual(vm.ip, 1);
+}
+
+test "swap fails in case of underflow" {
+    var vm = VM.init(&[_]u8{}, testing.allocator);
+    defer vm.deinit();
+    try testing.expectError(error.StackUnderflow, vm.execute_swap());
+    try vm.stack.append(vm.allocator, @as(u64, 10));
+    try testing.expectError(error.StackUnderflow, vm.execute_swap());
+}
+
+test "swap is successful" {
+    var vm = VM.init(&[_]u8{}, testing.allocator);
+    defer vm.deinit();
+    try vm.stack.append(vm.allocator, @as(u64, 10));
+    try vm.stack.append(vm.allocator, @as(u64, 20));
+
+    try vm.execute_swap();
+    try testing.expectEqual(vm.stack.items.len, 2);
+    try testing.expectEqualSlices(u64, vm.stack.items, &[2]u64{ 20, 10 });
     try testing.expectEqual(vm.ip, 1);
 }
